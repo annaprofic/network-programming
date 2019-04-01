@@ -14,12 +14,19 @@ import java.util.Comparator;
 
 public class MailExchange {
 
-    private static ArrayList<String> ip = new ArrayList<String>();
+    private static ArrayList<String> ip = new ArrayList<>();
 
-    private static void lookUpMailHosts(String domainName) throws NamingException, UnknownHostException {
+    private static void lookUpMailHosts(String domainName) {
+        InitialDirContext iDirC = null;
+        Attributes attributes = null;
+        try {
+            iDirC = new InitialDirContext();
+            attributes = iDirC.getAttributes("dns:/" + domainName, new String[] {"MX"});
+        } catch (NamingException e) {
+            System.out.println("Wrong name!");
+            System.exit(1);
+        }
 
-        InitialDirContext iDirC = new InitialDirContext();
-        Attributes attributes = iDirC.getAttributes("dns:/" + domainName, new String[] {"MX"});
         Attribute attributeMX = attributes.get("MX");
 
         if (attributeMX == null) {
@@ -29,7 +36,11 @@ public class MailExchange {
 
         String[][] pvhn = new String[attributeMX.size()][2];
         for (int i = 0; i < attributeMX.size(); i++) {
-            pvhn[i] = ("" + attributeMX.get(i)).split("\\s+");
+            try {
+                pvhn[i] = ("" + attributeMX.get(i)).split("\\s+");
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
         }
 
         Arrays.sort(pvhn, Comparator.comparingInt(o -> Integer.parseInt(o[0])));
@@ -40,7 +51,11 @@ public class MailExchange {
                     pvhn[i][1].substring(0, pvhn[i][1].length() - 1) : pvhn[i][1];
         }
 
-        IPSearch(sortedHostNames);
+        try {
+            IPSearch(sortedHostNames);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -54,7 +69,6 @@ public class MailExchange {
     }
 
     private static void TCPConnecting() throws IOException {
-
         for (String address: ip) {
             Socket clientSocket = new Socket(address, 25);
             BufferedReader inFromServer = new BufferedReader((new InputStreamReader(clientSocket.getInputStream())));
@@ -68,10 +82,17 @@ public class MailExchange {
 
     public static void main(String[] args) throws NamingException, IOException {
         BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in));
-        while (true) {
-            lookUpMailHosts(userInput.readLine());
-            TCPConnecting();
+        boolean exit = false;
+        System.out.println("If you want to exit just enter 'exit'.");
+        while (!exit) {
+            String line = userInput.readLine();
+            if (line.equals("exit")) exit = true;
+            else {
+                lookUpMailHosts(line);
+                TCPConnecting();
+            }
         }
+        System.out.println("Goodbye.");
 
     }
 }
